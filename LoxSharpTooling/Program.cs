@@ -21,6 +21,7 @@ internal class Program
         {
             "Assign     : Token name, Expr value",
             "Binary     : Expr left, Token oper, Expr right",
+            "Call       : Expr callee, Token paren, List<Expr> arguments",
             "Grouping   : Expr expression",
             "Literal    : object value",
             "Logical    : Expr left, Token oper, Expr right",
@@ -32,9 +33,12 @@ internal class Program
         {
             "Block          : List<Stmt> statements",
             "Expression     : Expr expression",
+            "Function       : Token name, List<Token> parameters, List<Stmt> body",
             "If             : Expr condition, Stmt thenBranch, Stmt elseBranch",
             "Print          : Expr expression",
-            "Var            : Token name, Expr intitializer"
+            "Return         : Token keyword, Expr value",
+            "Var            : Token name, Expr intitializer",
+            "While          : Expr condition, Stmt body"
         });
     }
 

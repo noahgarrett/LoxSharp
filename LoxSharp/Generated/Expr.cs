@@ -7,6 +7,7 @@ public abstract class Expr
   public interface Visitor<T> {
      T visitAssignExpr(Assign expr);
      T visitBinaryExpr(Binary expr);
+     T visitCallExpr(Call expr);
      T visitGroupingExpr(Grouping expr);
      T visitLiteralExpr(Literal expr);
      T visitLogicalExpr(Logical expr);
@@ -40,6 +41,21 @@ public abstract class Expr
      public readonly Expr left;
      public readonly Token oper;
      public readonly Expr right;
+  }
+  public class Call : Expr {
+      public Call(Expr callee, Token paren, List<Expr> arguments) {
+         this.callee = callee;
+         this.paren = paren;
+         this.arguments = arguments;
+  }
+
+      public override T accept<T>(Visitor<T> visitor) {
+          return visitor.visitCallExpr(this);
+      }
+
+     public readonly Expr callee;
+     public readonly Token paren;
+     public readonly List<Expr> arguments;
   }
   public class Grouping : Expr {
       public Grouping(Expr expression) {

@@ -3,17 +3,17 @@ using LoxSharp.Models;
 
 namespace LoxSharp;
 
-public class EnvironmentContext
+public class LoxEnvironment
 {
-    public readonly EnvironmentContext? enclosing;
+    public readonly LoxEnvironment? enclosing;
     private readonly Dictionary<string, object> values = new();
 
-    public EnvironmentContext()
+    public LoxEnvironment()
     {
         enclosing = null;
     }
 
-    public EnvironmentContext(EnvironmentContext _enclosing)
+    public LoxEnvironment(LoxEnvironment _enclosing)
     {
         enclosing = _enclosing;
     }

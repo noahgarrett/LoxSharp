@@ -1,13 +1,26 @@
 ﻿using LoxSharp.Enums;
 using LoxSharp.Exceptions;
+using LoxSharp.Interfaces;
 using LoxSharp.Models;
+using LoxSharp.NativeFunctions;
 using LoxSharp.Utils;
 
 namespace LoxSharp;
 
 public class Interpreter : Expr.Visitor<object>, Stmt.Visitor<Unit>
 {
-    private EnvironmentContext environment = new();
+    public static readonly LoxEnvironment globals = new();
+    private LoxEnvironment environment = globals;
+
+    public Interpreter()
+    {
+        globals.define("clock", Clock.Instance);
+    }
+
+    public LoxEnvironment GetGlobalEnv()
+    {
+        return globals;
+    }
 
     public void interpret(List<Stmt> statements)
     {
@@ -27,9 +40,9 @@ public class Interpreter : Expr.Visitor<object>, Stmt.Visitor<Unit>
         stmt.accept(this);
     }
 
-    private void executeBlock(List<Stmt> statements, EnvironmentContext env)
+    public void executeBlock(List<Stmt> statements, LoxEnvironment env)
     {
-        EnvironmentContext previous = environment;
+        LoxEnvironment previous = environment;
 
         try
         {
@@ -59,6 +72,15 @@ public class Interpreter : Expr.Visitor<object>, Stmt.Visitor<Unit>
         return Unit.Default;
     }
 
+    Unit Stmt.Visitor<Unit>.visitReturnStmt(Stmt.Return stmt)
+    {
+        object? value = null;
+        if (stmt.value != null)
+            value = evaluate(stmt.value);
+
+        throw new Return(value);
+    }
+
     Unit Stmt.Visitor<Unit>.visitExpressionStmt(Stmt.Expression stmt)
     {
         evaluate(stmt.expression);
@@ -79,7 +101,7 @@ public class Interpreter : Expr.Visitor<object>, Stmt.Visitor<Unit>
 
     Unit Stmt.Visitor<Unit>.visitBlockStmt(Stmt.Block stmt)
     {
-        executeBlock(stmt.statements, new EnvironmentContext(environment));
+        executeBlock(stmt.statements, new LoxEnvironment(environment));
 
         return Unit.Default;
     }
@@ -95,6 +117,23 @@ public class Interpreter : Expr.Visitor<object>, Stmt.Visitor<Unit>
             execute(stmt.elseBranch);
         }
 
+        return Unit.Default;
+    }
+
+    Unit Stmt.Visitor<Unit>.visitWhileStmt(Stmt.While stmt)
+    {
+        while (isTruthy(evaluate(stmt.condition))) 
+        {
+            execute(stmt.body);
+        }
+
+        return Unit.Default;
+    }
+
+    Unit Stmt.Visitor<Unit>.visitFunctionStmt(Stmt.Function stmt)
+    {
+        LoxFunction function = new(stmt, environment);
+        environment.define(stmt.name.lexeme, function);
         return Unit.Default;
     }
     #endregion
@@ -141,6 +180,30 @@ public class Interpreter : Expr.Visitor<object>, Stmt.Visitor<Unit>
 
         // Unreachable
         return null;
+    }
+
+    public object visitCallExpr(Expr.Call expr)
+    {
+        object callee = evaluate(expr.callee);
+
+        List<object> arguments = new List<object>();
+        foreach (Expr argument in expr.arguments)
+        {
+            arguments.Add(evaluate(argument));
+        }
+
+        if (callee is not ILoxCallable)
+        {
+            throw new RuntimeError(expr.paren, "Can only call functions and classes");
+        }
+
+        ILoxCallable function = (ILoxCallable)callee;
+        if (arguments.Count != function.arity())
+        {
+            throw new RuntimeError(expr.paren, $"Expected {function.arity()} arguments but got {arguments.Count}.");
+        }
+
+        return function.call(this, arguments);
     }
 
     public object visitGroupingExpr(Expr.Grouping expr)
