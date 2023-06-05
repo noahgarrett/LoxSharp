@@ -10,6 +10,7 @@ namespace LoxSharp;
 public class Interpreter : Expr.Visitor<object>, Stmt.Visitor<Unit>
 {
     public static readonly LoxEnvironment globals = new();
+    private readonly Dictionary<Expr, int> locals = new();
     private LoxEnvironment environment = globals;
 
     public Interpreter()
@@ -38,6 +39,11 @@ public class Interpreter : Expr.Visitor<object>, Stmt.Visitor<Unit>
     private void execute(Stmt stmt)
     {
         stmt.accept(this);
+    }
+
+    public void resolve(Expr expr, int depth)
+    {
+        locals.Add(expr, depth);
     }
 
     public void executeBlock(List<Stmt> statements, LoxEnvironment env)
@@ -235,14 +241,22 @@ public class Interpreter : Expr.Visitor<object>, Stmt.Visitor<Unit>
 
     public object visitVariableExpr(Expr.Variable expr)
     {
-        return environment.get(expr.name);
+        return lookupVariable(expr.name, expr);
     }
 
     public object visitAssignExpr(Expr.Assign expr)
     {
         object value = evaluate(expr.value);
 
-        environment.assign(expr.name, value);
+        var distance = locals.GetValueOrDefault(expr);
+        if (distance != null)
+        {
+            environment.assignAt(distance, expr.name, value);
+        }
+        else
+        {
+            globals.assign(expr.name, value);
+        }
 
         return value;
     }
@@ -310,6 +324,19 @@ public class Interpreter : Expr.Visitor<object>, Stmt.Visitor<Unit>
         }
 
         return obj.ToString();
+    }
+
+    private object lookupVariable(Token name, Expr expr)
+    {
+        var distance = locals.GetValueOrDefault(expr);
+        if (distance != null)
+        {
+            return environment.getAt(distance, name.lexeme);
+        }
+        else
+        {
+            return globals.get(name);
+        }
     }
     #endregion
 }

@@ -7,10 +7,17 @@ public class Resolver : Expr.Visitor<Unit>, Stmt.Visitor<Unit>
 {
     private readonly Interpreter interpreter;
     private readonly Stack<Dictionary<string, bool>> scopes = new();
+    private FunctionType currentFunction = FunctionType.NONE;
 
     public Resolver(Interpreter _interpreter)
     {
         interpreter = _interpreter;
+    }
+
+    private enum FunctionType
+    {
+        NONE,
+        FUNCTION
     }
 
     #region Expression Nodes
@@ -23,32 +30,43 @@ public class Resolver : Expr.Visitor<Unit>, Stmt.Visitor<Unit>
 
     public Unit visitBinaryExpr(Expr.Binary expr)
     {
-        throw new NotImplementedException();
+        resolve(expr.left);
+        resolve(expr.right);
+
+        return Unit.Default;
     }
 
     public Unit visitCallExpr(Expr.Call expr)
     {
-        throw new NotImplementedException();
+        resolve(expr.callee);
+
+        foreach (Expr argument in expr.arguments) resolve(argument);
+
+        return Unit.Default;
     }
 
     public Unit visitGroupingExpr(Expr.Grouping expr)
     {
-        throw new NotImplementedException();
+        resolve(expr.expression);
+        return Unit.Default;
     }
 
     public Unit visitLiteralExpr(Expr.Literal expr)
     {
-        throw new NotImplementedException();
+        return Unit.Default;
     }
 
     public Unit visitLogicalExpr(Expr.Logical expr)
     {
-        throw new NotImplementedException();
+        resolve(expr.left);
+        resolve(expr.right);
+        return Unit.Default;
     }
 
     public Unit visitUnaryExpr(Expr.Unary expr)
     {
-        throw new NotImplementedException();
+        resolve(expr.right);
+        return Unit.Default;
     }
 
     public Unit visitVariableExpr(Expr.Variable expr)
@@ -84,7 +102,7 @@ public class Resolver : Expr.Visitor<Unit>, Stmt.Visitor<Unit>
         declare(stmt.name);
         define(stmt.name);
 
-        resolveFunction(stmt);
+        resolveFunction(stmt, FunctionType.FUNCTION);
 
         return Unit.Default;
     }
@@ -106,6 +124,11 @@ public class Resolver : Expr.Visitor<Unit>, Stmt.Visitor<Unit>
 
     public Unit visitReturnStmt(Stmt.Return stmt)
     {
+        if (currentFunction == FunctionType.NONE)
+        {
+            Program.Error(stmt.keyword, "Can't return from top-level code");
+        }
+
         if (stmt.value != null) resolve(stmt.value);
 
         return Unit.Default;
@@ -166,6 +189,11 @@ public class Resolver : Expr.Visitor<Unit>, Stmt.Visitor<Unit>
         if (scopes.Count == 0) return;
 
         Dictionary<string, bool> scope = scopes.Peek();
+        if (scope.ContainsKey(name.lexeme))
+        {
+            Program.Error(name, "Already a variable with this name in this scope");
+        }
+
         scope.Add(name.lexeme, false);
     }
 
@@ -188,8 +216,11 @@ public class Resolver : Expr.Visitor<Unit>, Stmt.Visitor<Unit>
         }
     }
 
-    private void resolveFunction(Stmt.Function function)
+    private void resolveFunction(Stmt.Function function, FunctionType type)
     {
+        FunctionType enclosingFunction = currentFunction;
+        currentFunction = type;
+
         beginScope();
 
         foreach (Token param in function.parameters)
@@ -200,6 +231,8 @@ public class Resolver : Expr.Visitor<Unit>, Stmt.Visitor<Unit>
 
         resolve(function.body);
         endScope();
+
+        currentFunction = enclosingFunction;
     }
     #endregion
 }
